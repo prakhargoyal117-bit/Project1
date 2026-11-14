@@ -1,0 +1,6 @@
+{
+  "name": "NTA ExamForge Studio",
+  "description": "Convert JEE Main question PDFs and answer sheets into an authentic NTA Computer-Based Test (CBT) simulator with KaTeX math parsing and dataset management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

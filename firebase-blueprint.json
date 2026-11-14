@@ -1,0 +1,208 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private student or educator profile linked to a verified Google account.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "targetExam": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "candidateCategory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "defaultDurationMinutes": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "targetExam",
+        "candidateCategory",
+        "defaultDurationMinutes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExamPaper": {
+      "title": "ExamPaper",
+      "description": "Extracted or imported JEE Main CBT question paper dataset owned by a single user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sourceFileName": {
+          "type": "string",
+          "maxLength": 260
+        },
+        "durationMinutes": {
+          "type": "integer"
+        },
+        "numericalNegativeMarking": {
+          "type": "integer"
+        },
+        "answerKeyAttached": {
+          "type": "boolean"
+        },
+        "answerKeySource": {
+          "type": "string",
+          "maxLength": 260
+        },
+        "questions": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "title",
+        "durationMinutes",
+        "numericalNegativeMarking",
+        "answerKeyAttached",
+        "questions",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExamAttempt": {
+      "title": "ExamAttempt",
+      "description": "Completed CBT attempt and evaluation scorecard owned by a single user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "paperId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "paperTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeTakenSeconds": {
+          "type": "integer"
+        },
+        "responses": {
+          "type": "object"
+        },
+        "evaluation": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "paperId",
+        "paperTitle",
+        "submittedAt",
+        "timeTakenSeconds",
+        "responses",
+        "evaluation",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile/info": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Private user profile and exam preferences accessible exclusively to the owning verified user."
+    },
+    "/users/{userId}/papers/{paperId}": {
+      "schema": {
+        "$ref": "#/entities/ExamPaper"
+      },
+      "description": "Processed JEE Main PDF question paper datasets owned exclusively by userId."
+    },
+    "/users/{userId}/attempts/{attemptId}": {
+      "schema": {
+        "$ref": "#/entities/ExamAttempt"
+      },
+      "description": "Completed CBT exam attempts and evaluation scorecards owned exclusively by userId."
+    }
+  }
+}

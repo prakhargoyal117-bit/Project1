@@ -1,0 +1,217 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'email',
+          'displayName',
+          'targetExam',
+          'candidateCategory',
+          'defaultDurationMinutes',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'targetExam',
+          'candidateCategory',
+          'defaultDurationMinutes',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.targetExam is string && data.targetExam.size() >= 1 && data.targetExam.size() <= 80
+        && data.candidateCategory is string && data.candidateCategory.size() >= 1 && data.candidateCategory.size() <= 60
+        && data.defaultDurationMinutes is int && data.defaultDurationMinutes >= 5 && data.defaultDurationMinutes <= 360
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidExamPaper(data, userId, paperId) {
+      return data.keys().hasAll([
+          'id',
+          'ownerId',
+          'title',
+          'durationMinutes',
+          'numericalNegativeMarking',
+          'answerKeyAttached',
+          'questions',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'ownerId',
+          'title',
+          'sourceFileName',
+          'durationMinutes',
+          'numericalNegativeMarking',
+          'answerKeyAttached',
+          'answerKeySource',
+          'questions',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.id is string && data.id == paperId && isValidId(data.id)
+        && data.ownerId is string && data.ownerId == userId && isValidId(data.ownerId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && (!('sourceFileName' in data) || (data.sourceFileName is string && data.sourceFileName.size() <= 260))
+        && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 360
+        && data.numericalNegativeMarking is int && (data.numericalNegativeMarking == 0 || data.numericalNegativeMarking == 1)
+        && data.answerKeyAttached is bool
+        && (!('answerKeySource' in data) || (data.answerKeySource is string && data.answerKeySource.size() <= 260))
+        && data.questions is list && data.questions.size() > 0 && data.questions.size() <= 200 && data.questions[0] is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidExamAttempt(data, userId, attemptId) {
+      return data.keys().hasAll([
+          'id',
+          'ownerId',
+          'paperId',
+          'paperTitle',
+          'submittedAt',
+          'timeTakenSeconds',
+          'responses',
+          'evaluation',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'ownerId',
+          'paperId',
+          'paperTitle',
+          'submittedAt',
+          'timeTakenSeconds',
+          'responses',
+          'evaluation',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.id is string && data.id == attemptId && isValidId(data.id)
+        && data.ownerId is string && data.ownerId == userId && isValidId(data.ownerId)
+        && data.paperId is string && isValidId(data.paperId)
+        && data.paperTitle is string && data.paperTitle.size() >= 1 && data.paperTitle.size() <= 200
+        && data.submittedAt is string && data.submittedAt.size() >= 1 && data.submittedAt.size() <= 64
+        && data.timeTakenSeconds is int && data.timeTakenSeconds >= 0 && data.timeTakenSeconds <= 86400
+        && data.responses is map
+        && data.evaluation is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      // Private user profile
+      match /profile/info {
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidUserProfile(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidUserProfile(incoming(), userId)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName',
+            'photoURL',
+            'targetExam',
+            'candidateCategory',
+            'defaultDurationMinutes',
+            'updatedAt'
+          ]);
+        allow delete: if isOwner(userId);
+      }
+
+      // Owner-isolated processed PDF exam papers
+      match /papers/{paperId} {
+        allow get: if isOwner(userId) && isValidId(paperId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(paperId)
+          && isValidExamPaper(incoming(), userId, paperId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(paperId)
+          && isValidExamPaper(incoming(), userId, paperId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title',
+            'sourceFileName',
+            'durationMinutes',
+            'numericalNegativeMarking',
+            'answerKeyAttached',
+            'answerKeySource',
+            'questions',
+            'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(paperId);
+      }
+
+      // Owner-isolated CBT exam attempts & evaluation scorecards
+      match /attempts/{attemptId} {
+        allow get: if isOwner(userId) && isValidId(attemptId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(attemptId)
+          && isValidExamAttempt(incoming(), userId, attemptId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId)/papers/$(incoming().paperId));
+        allow update: if isOwner(userId)
+          && isValidId(attemptId)
+          && isValidExamAttempt(incoming(), userId, attemptId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().paperId == existing().paperId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'paperTitle',
+            'evaluation',
+            'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(attemptId);
+      }
+    }
+  }
+}
